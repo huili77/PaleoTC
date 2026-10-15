@@ -30,7 +30,7 @@ on branch `feature/tc-stress-pipeline` shows what is done.
 - [x] Task 5: Flux formulas
 - [x] Task 6: Extraction stage
 - [x] Task 7: Stress stage
-- [ ] Task 8: POP export stage
+- [x] Task 8: POP export stage
 - [ ] Task 9: Pipeline, Casper cluster, CLI
 - [ ] Task 10: Real-data run (year 31) + QC, then all 30 years
 - [ ] Task 11: get_tau review notes + README
