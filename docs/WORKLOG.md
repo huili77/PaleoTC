@@ -24,7 +24,7 @@ on branch `feature/tc-stress-pipeline` shows what is done.
 ## Task status
 
 - [x] Task 1: Branch, environment, scaffold, config
-- [ ] Task 2: Track parsing
+- [x] Task 2: Track parsing
 - [ ] Task 3: Regridder
 - [ ] Task 4: TC box mask
 - [ ] Task 5: Flux formulas
