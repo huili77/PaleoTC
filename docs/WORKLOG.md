@@ -30,7 +30,7 @@ Continue from the first unchecked task below. Each task ends with a git commit o
 - [x] Task 4: `run_casper.py` (dask-jobqueue on Casper)
 - [x] Task 5: Real run for year 31 + `qc_tau.py`, then all 30 years
 - [~] Task 6: get_tau review notes + README (skipped by Hui, 2026-10-15)
-- [ ] Task 7: Port the POP SourceMods (Steps 1–5 Claude; Step 6 Hui)
+- [x] Task 7: Port the POP SourceMods (Steps 1–5 done; Step 6, build + 5-day test, is Hui's)
 - [ ] Final whole-branch review
 
 ## Log
@@ -45,3 +45,4 @@ Continue from the first unchecked task below. Each task ends with a git commit o
 - 2026-10-15: tc_bot reorganized into tc_bot/YYYY/ (code + existing 38851 files moved); tc_tau kept flat (POP). QC year 55: 1256 files, max |tau| 14.0 N/m2 (U10 55.9 vs native 58.3 m/s), no NaN; get_tau rerun from new layout reproduces all 1256 files exactly.
 - 2026-10-15: Checked the map file against jiangzhu's `map_ne120np4_TO_gx1v6_eocene_{blin,patc,aave}.231017.nc`. Grids are identical and the weights match to 1e-8 (only the ESMF version differs), so it is the same map. Blin vs patch on the strongest year-55 snapshot: max U10 54.3 vs 54.0 m/s, integrated |tau| within 0.3%. Decision: keep `gx1eocene_blin.260410` (matches the LR coupler's ATM2OCN_VMAPNAME). No rerun.
 - 2026-10-15: Task 6 skipped. Checked Li's SourceMods against iCESM1.3.1. Li's forcing_ws.F90 = tag + TC blocks (compiles, but it adds the stress, has no TCMASK, and hard-codes the old path). Li's forcing_coupled.F90 must not be used: it is from POP rev 26603 and would drop Jiang Zhu's ROFF_L estuary mods in the LR case. Plan Task 7 fixed: rotate_wind_stress WORK1/WORK2 intent(in)->intent(inout) (the build would fail otherwise). Open item added: with OCN_NCPL=1 only the 00Z snapshot is read and held for the whole day.
+- 2026-10-15: Task 7 Steps 1-5 done. sourcemods/orig_iCESM1.3.1/ (tag originals, read-only), sourcemods/orig_LRcase/forcing_coupled.F90 (LR-case base, read-only), sourcemods/src.pop/ (modified). Both modified files compile with ifort 2021.8.0 (oneAPI 2023.0.0 classic, same as the LR build) using the LR case's ocn .mod files and flags; restoring intent(in) gives error #6780, so the intent fix is required. The hard-coded tc_filename matches config.yaml (9730 00Z files exist). Next: Hui's Step 6 (clone LR-cntl -> LR-TC, build, 5-day test), then the final review.
