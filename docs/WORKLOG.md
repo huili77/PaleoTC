@@ -28,7 +28,7 @@ Continue from the first unchecked task below. Each task ends with a git commit o
 - [x] Task 2: `extract_tcbot.py` (NCL translation) + tests
 - [x] Task 3: `get_tau.py` (notebook replacement) + tests
 - [x] Task 4: `run_casper.py` (dask-jobqueue on Casper)
-- [ ] Task 5: Real run for year 31 + `qc_tau.py`, then all 30 years
+- [x] Task 5: Real run for year 31 + `qc_tau.py`, then all 30 years
 - [ ] Task 6: get_tau review notes + README
 - [ ] Task 7: Port the POP SourceMods (Steps 1–5 Claude; Step 6 Hui)
 - [ ] Final whole-branch review
@@ -41,3 +41,4 @@ Continue from the first unchecked task below. Each task ends with a git commit o
 - 2026-10-15: v2 Task 2 done: extract_tcbot.py + test_tc.py (4 tests). Awaiting Hui's code review; not yet run on real HR data.
 - 2026-10-15: v2 Task 3 done: get_tau.py (+3 tests, 7 total). Tested extract+get_tau on year 31 Jan 1-3 (12 steps): max |tau| 1.4-2.7 N/m2, no NaN, zero outside boxes. Casper account P93300014 is invalid -> must change casper.account in config.yaml before Task 4/5.
 - 2026-10-15: v2 Task 4 done: run_casper.py written; job script checked (not yet submitted). casper.account changed to P93300313 by Hui.
+- 2026-10-15: v2 Task 5 done: years 31-60 run on Casper in ~6 min (30 workers, no failures). 38851 tcbot + 38851 tau files (= all track times except the year-61 point), tc_tau 54 GB on scratch. QC year 31: max |tau| 11.5 N/m2 (U10 51.6 vs native 53.6 m/s), no NaN. Pending: Hui's decision on organizing outputs by year (tc_bot yes; tc_tau must stay flat unless SourceMod changes); copy tc_tau off scratch.
