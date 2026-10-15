@@ -1,42 +1,39 @@
 # PaleoTC worklog
 
 How to resume in a new session: read this file first, then the plan
-`docs/superpowers/plans/2026-10-15-tc-wind-stress-pipeline.md`. Continue from the
-first unchecked task below. Each task ends with a git commit, so `git log --oneline`
-on branch `feature/tc-stress-pipeline` shows what is done.
+`docs/superpowers/plans/2026-10-15-tc-wind-stress-pipeline.md` (the simplified version).
+Continue from the first unchecked task below. Each task ends with a git commit on branch
+`feature/tc-stress-pipeline`, so `git log --oneline` shows what is done.
 
 ## Decisions (2026-10-15)
 
-- **Coupler semantics:** the TC stress **replaces** the coupler stress inside the boxes (`TCMASK`), it is not added to it. The Li et al. 2023 SourceMod added it; Task 12 ports the code with replace semantics.
-- **`export.lr_year_offset`:** 0 for now (LR-TC model year = HR year). Revisit before the LR-TC run.
-- **Task 12 Step 6** (LR-TC build and 5-day test run): Hui runs this, not Claude.
-- **Execution mode:** native. Claude implements the tasks in one session, then one reviewer checks the whole branch at the end.
+- **Coupler semantics:** the TC stress **replaces** the coupler stress where `TCMASK = 1`, rather than being added (the Li et al. 2023 SourceMod added it).
+- **`lr_year_offset`:** 0 for now (LR-TC model year = HR year). Revisit before the LR-TC run.
+- **SourceMod build and 5-day test** (Task 7 Step 6): Hui runs this.
+- **Execution mode:** native. Claude implements the tasks, then one reviewer checks the whole branch at the end.
 - **No further checks of the U10-shortcut error.** Already measured: within 0.9% for 10–70 m/s.
-- Other design decisions (h2 stream, gx1eocene weights, air density, cdn) are in the plan's "Design decisions" table.
+- **Simplified approach (replaces v1):** plain Python scripts that translate the old NCL and notebook, with no package. Intermediate output is one file per TC time step (option 1). The v1 package (commits `55460e4..57eefaa`) is removed in Task 1, but stays in git history.
+- The science and grid decisions (h2 stream, gx1eocene weights, air density, cdn, longitude-wrap fix) are in the plan's "Design decisions" table.
 
 ## Environment
 
-- Conda env: `/glade/work/huili7/miniconda3/envs/paleotc` (created in Task 1).
+- Conda env: `/glade/work/huili7/miniconda3/envs/paleotc` (already created; no `pip install` needed)
   Activate with `module load conda; conda activate /glade/work/huili7/miniconda3/envs/paleotc`
 - Git branch: `feature/tc-stress-pipeline`
-- Outputs: `/glade/derecho/scratch/huili7/PaleoTC`
+- Outputs: `/glade/derecho/scratch/huili7/PaleoTC/{tc_bot,tc_tau}`
 
-## Task status
+## Task status (simplified plan)
 
-- [x] Task 1: Branch, environment, scaffold, config
-- [x] Task 2: Track parsing
-- [x] Task 3: Regridder
-- [x] Task 4: TC box mask
-- [x] Task 5: Flux formulas
-- [x] Task 6: Extraction stage
-- [x] Task 7: Stress stage
-- [x] Task 8: POP export stage
-- [x] Task 9: Pipeline, Casper cluster, CLI
-- [ ] Task 10: Real-data run (year 31) + QC, then all 30 years
-- [ ] Task 11: get_tau review notes + README
-- [ ] Task 12: Port the POP SourceMods (Steps 1–5 Claude; Step 6 Hui)
+- [ ] Task 1: Remove the package; add a plain `config.yaml`
+- [ ] Task 2: `extract_tcbot.py` (NCL translation) + tests
+- [ ] Task 3: `get_tau.py` (notebook replacement) + tests
+- [ ] Task 4: `run_casper.py` (dask-jobqueue on Casper)
+- [ ] Task 5: Real run for year 31 + `qc_tau.py`, then all 30 years
+- [ ] Task 6: get_tau review notes + README
+- [ ] Task 7: Port the POP SourceMods (Steps 1–5 Claude; Step 6 Hui)
 - [ ] Final whole-branch review
 
 ## Log
 
-- 2026-10-15: Plan written and approved, worklog created. Implementation starting with Task 1.
+- 2026-10-15: v1 plan (a package of 9 modules) implemented through Task 9 and committed (`55460e4..57eefaa`, 31 tests passing).
+- 2026-10-15: Hui found it too complicated. The plan was rewritten as simple scripts (this version); implementation has not started yet.
