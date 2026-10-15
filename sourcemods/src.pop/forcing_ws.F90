@@ -32,12 +32,25 @@
 ! !PUBLIC MEMBER FUNCTIONS:
 
    public :: init_ws, &
-             set_ws
+             set_ws,  &
+!----- PaleoTC mod
+             check_tc_ws
+!----- PaleoTC mod end
 
 ! !PUBLIC DATA MEMBERS:
 
    real (r8), public :: &! needed by restart
       ws_interp_last     ! time when last interpolation was done
+
+!----- PaleoTC mod
+   real (r8), public, dimension(nx_block,ny_block,2,max_blocks_clinic) :: &
+      SMFT_TC       ! TC momentum flux read in, on T grid (east/north, N/m2)
+   real (r8), dimension(nx_block,ny_block,max_blocks_clinic) :: &
+      TC_MASK       ! 1 inside TC boxes over ocean, 0 elsewhere
+
+   character (char_len), parameter :: tc_filename = &
+      '/glade/derecho/scratch/huili7/PaleoTC/tc_tau/b.e13.B1850C5.ne120_t12.icesm13_ihesp.eocene_03x.002.tctau'
+!----- PaleoTC mod end
 
 !EOP
 !BOC
@@ -732,6 +745,79 @@
 !EOC
 
  end subroutine set_ws
+
+!----- PaleoTC mod
+!***********************************************************************
+!BOP
+! !IROUTINE: check_tc_ws
+! !INTERFACE:
+
+ subroutine check_tc_ws(WORK1,WORK2)
+
+! !DESCRIPTION:
+!  If a TC wind-stress file exists for the current coupling time, replace
+!  the coupler wind stress (east/north, N/m2) inside the TC boxes (TCMASK=1).
+
+   real (r8), dimension(nx_block,ny_block,max_blocks_clinic), intent(inout) :: &
+      WORK1, WORK2        ! taux and tauy from coupler
+
+   integer (int_kind) :: iblock
+   character (char_len) :: forcing_filename
+   type (datafile) :: forcing_file
+   type (io_field_desc) :: io_taux, io_tauy, io_mask
+   type (io_dim) :: i_dim, j_dim
+   logical (log_kind) :: iexist
+
+   call get_forcing_filename(forcing_filename, tc_filename, thour00, c1)
+   forcing_filename = trim(forcing_filename)//'.nc'
+   inquire (file=trim(forcing_filename), exist=iexist)
+   if (.not. iexist) return
+
+   SMFT_TC = c0
+   TC_MASK = c0
+   forcing_file = construct_file('nc', full_name=trim(forcing_filename), &
+                                 record_length=rec_type_dbl,             &
+                                 recl_words=nx_global*ny_global)
+   call data_set(forcing_file,'open_read')
+   i_dim = construct_io_dim('i',nx_global)
+   j_dim = construct_io_dim('j',ny_global)
+   io_taux = construct_io_field('TAUX', dim1=i_dim, dim2=j_dim,          &
+                field_loc=field_loc_center, field_type=field_type_vector, &
+                d2d_array=SMFT_TC(:,:,1,:))
+   io_tauy = construct_io_field('TAUY', dim1=i_dim, dim2=j_dim,          &
+                field_loc=field_loc_center, field_type=field_type_vector, &
+                d2d_array=SMFT_TC(:,:,2,:))
+   io_mask = construct_io_field('TCMASK', dim1=i_dim, dim2=j_dim,        &
+                field_loc=field_loc_center, field_type=field_type_scalar, &
+                d2d_array=TC_MASK)
+   call data_set(forcing_file,'define',io_taux)
+   call data_set(forcing_file,'define',io_tauy)
+   call data_set(forcing_file,'define',io_mask)
+   call data_set(forcing_file,'read'  ,io_taux)
+   call data_set(forcing_file,'read'  ,io_tauy)
+   call data_set(forcing_file,'read'  ,io_mask)
+   call destroy_io_field(io_taux)
+   call destroy_io_field(io_tauy)
+   call destroy_io_field(io_mask)
+   call data_set(forcing_file,'close')
+   call destroy_file(forcing_file)
+
+   if (my_task == master_task) then
+      write(stdout,'(a22,a)') ' TC file read: ', trim(forcing_filename)
+   endif
+
+   !$OMP PARALLEL DO PRIVATE(iblock)
+   do iblock=1,nblocks_clinic
+      where (TC_MASK(:,:,iblock) > p5)
+         WORK1(:,:,iblock) = SMFT_TC(:,:,1,iblock)
+         WORK2(:,:,iblock) = SMFT_TC(:,:,2,iblock)
+      end where
+   end do
+   !$OMP END PARALLEL DO
+
+ end subroutine check_tc_ws
+!EOC
+!----- PaleoTC mod end
 
 !***********************************************************************
 

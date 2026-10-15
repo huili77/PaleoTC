@@ -40,7 +40,9 @@
    use ice, only: tfreez, tmelt, liceform,QFLUX, QICE, AQICE, tlast_ice
    use forcing_shf
    use forcing_sfwf
-   use forcing_ws, only: ws_data_type
+!----- PaleoTC mod: TC wind stress
+   use forcing_ws, only: ws_data_type, check_tc_ws
+!----- PaleoTC mod end
    use forcing_fields
    use timers
 
@@ -1415,7 +1417,9 @@
 
 ! !INPUT PARAMETERS:
 
-   real (r8), dimension(nx_block,ny_block,max_blocks_clinic), intent(in) ::   &
+!----- PaleoTC mod: intent(in) -> intent(inout), check_tc_ws modifies WORK1/WORK2
+   real (r8), dimension(nx_block,ny_block,max_blocks_clinic), intent(inout) ::   &
+!----- PaleoTC mod end
       WORK1, WORK2        ! contains taux and tauy from coupler
 
 
@@ -1435,6 +1439,10 @@
 !  rotate and convert
 !
 !-----------------------------------------------------------------------
+
+!----- PaleoTC mod: replace coupler stress inside TC boxes
+   call check_tc_ws(WORK1,WORK2)
+!----- PaleoTC mod end
 
    SMFT(:,:,1,:) = (WORK1(:,:,:)*cos(ANGLET(:,:,:)) +  &
                     WORK2(:,:,:)*sin(ANGLET(:,:,:)))*  &
