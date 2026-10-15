@@ -31,7 +31,7 @@ on branch `feature/tc-stress-pipeline` shows what is done.
 - [x] Task 6: Extraction stage
 - [x] Task 7: Stress stage
 - [x] Task 8: POP export stage
-- [ ] Task 9: Pipeline, Casper cluster, CLI
+- [x] Task 9: Pipeline, Casper cluster, CLI
 - [ ] Task 10: Real-data run (year 31) + QC, then all 30 years
 - [ ] Task 11: get_tau review notes + README
 - [ ] Task 12: Port the POP SourceMods (Steps 1–5 Claude; Step 6 Hui)
