@@ -13,7 +13,7 @@ lr_year_offset: 0             # LR-TC model year = HR year + offset (revisit bef
 tau_hours: [0, 6, 12, 18]
 
 casper:
-  account: P93300014
+  account: P93300313
   memory: 16GB
   walltime: "02:00:00"
   max_jobs: 30
