@@ -1,30 +1,20 @@
 # Eocene 3x CO2: HR (ne120_t12) TC winds -> LR (ne30_g16, gx1eocene) wind stress
 case: b.e13.B1850C5.ne120_t12.icesm13_ihesp.eocene_03x.002
 hr_dir: /glade/campaign/cesm/community/palwg/ASD_paleoWeather/b.e13.B1850C5.ne120_t12.icesm13_ihesp.eocene_03x.002/atm/proc/tseries/hour_6
-hr_stream: h2            # instantaneous 6-hourly; h4 is time-mean
 track_file: /glade/campaign/cgd/ppc/brady/paleoweather/TCs/Eo3x/F3/tracks/TC_Eo3x.002_F3tracks_yrs31-60.txt
-first_year: 31
-last_year: 60
-
 map_file: /glade/work/jiangzhu/data/inputdata/cesm13_eocene/ne120_g16/map_ne120np4_TO_gx1eocene_blin.260410.nc
 ocn_domain_file: /glade/work/jiangzhu/data/inputdata/cesm13_eocene/ne30_g16/domain.ocn.gx1eocene.260408.nc
-box_half_width: 10.0     # degrees; 20x20 box
-time_chunk: 120          # time steps read per chunk (~2.2 GB of native fields)
+box_half_width: 10.0          # degrees -> 20x20 box
 
-output_root: /glade/derecho/scratch/huili7/PaleoTC
+out_bot_dir: /glade/derecho/scratch/huili7/PaleoTC/tc_bot
+out_tau_dir: /glade/derecho/scratch/huili7/PaleoTC/tc_tau
+tau_prefix: b.e13.B1850C5.ne120_t12.icesm13_ihesp.eocene_03x.002.tctau
+lr_year_offset: 0             # LR-TC model year = HR year + offset (revisit before LR-TC run)
+tau_hours: [0, 6, 12, 18]
 
-export:
-  prefix: b.e13.B1850C5.ne120_t12.icesm13_ihesp.eocene_03x.002.tctau
-  lr_year_offset: 0      # CONFIRM: LR-TC model year = HR year + offset
-  hours: [0, 6, 12, 18]
-
-cluster:
+casper:
   account: P93300014
-  queue: casper
-  cores: 1
   memory: 16GB
   walltime: "02:00:00"
-  n_workers: 30
-  interface: ext
-  local_directory: /glade/derecho/scratch/huili7/dask-tmp
-  log_directory: /glade/derecho/scratch/huili7/PaleoTC/dask-logs
+  max_jobs: 30
+  log_dir: /glade/derecho/scratch/huili7/PaleoTC/dask-logs
