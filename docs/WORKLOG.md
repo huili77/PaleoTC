@@ -27,7 +27,7 @@ on branch `feature/tc-stress-pipeline` shows what is done.
 - [x] Task 2: Track parsing
 - [x] Task 3: Regridder
 - [x] Task 4: TC box mask
-- [ ] Task 5: Flux formulas
+- [x] Task 5: Flux formulas
 - [ ] Task 6: Extraction stage
 - [ ] Task 7: Stress stage
 - [ ] Task 8: POP export stage
