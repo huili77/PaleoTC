@@ -74,8 +74,8 @@ def test_box_wraps_longitude():
 def test_extract_end_to_end(cfg, capsys):
     assert extract_year(31, cfg) == 2
     assert "(31, 12, 31, 18)" in capsys.readouterr().out
-    a = xr.open_dataset(Path(cfg["out_bot_dir"]) / "tcbot.0031-01-01-00.nc")
-    b = xr.open_dataset(Path(cfg["out_bot_dir"]) / "tcbot.0031-01-01-06.nc")
+    a = xr.open_dataset(Path(cfg["out_bot_dir"]) / "0031" / "tcbot.0031-01-01-00.nc")
+    b = xr.open_dataset(Path(cfg["out_bot_dir"]) / "0031" / "tcbot.0031-01-01-06.nc")
     assert a.TCMASK.values.sum() == 1 and a.TCMASK.values[1, 0] == 1  # land box masked out
     assert a.attrs["ntc"] == 2
     assert b.TCMASK.values.sum() == 2 and b.TCMASK.values[2, 0] == 1  # wrapped storm
@@ -87,7 +87,7 @@ def test_extract_end_to_end(cfg, capsys):
 def test_rerun_overwrites(cfg):
     extract_year(31, cfg)
     extract_year(31, cfg)
-    assert len(list(Path(cfg["out_bot_dir"]).glob("*"))) == 2
+    assert len(list((Path(cfg["out_bot_dir"]) / "0031").glob("*"))) == 2
 
 
 # ---- get_tau.py ----

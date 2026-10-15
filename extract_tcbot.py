@@ -1,11 +1,10 @@
 """Extract TC winds and air density from the HR run, one year at a time.
 
-Python version of scripts_Li2023/extract_tcbot_batch.ncl. Same steps as the NCL:
   1. read the TC track file (TempestExtremes) and keep this year's TC points
   2. read the 6-hourly HR fields UBOT, VBOT, U10 (+ PS, TREFHT, QREFHT for air density)
   3. regrid them from ne120 to the LR ocean grid with ESMF weights
   4. at each time with TCs, keep a 20x20 deg box around every TC center; zero elsewhere
-  5. write one file per TC time step: <out_bot_dir>/tcbot.YYYY-MM-DD-HH.nc
+  5. write one file per TC time step: <out_bot_dir>/YYYY/tcbot.YYYY-MM-DD-HH.nc
 
 Changes from the NCL, for the Eocene runs:
   - reads the instantaneous h2 files (h4 holds 6-hourly means)
@@ -116,7 +115,7 @@ def extract_year(year, cfg):
     for key in sorted(set(tracks) - set(keys)):
         print(f"warning: track time {key} not in HR output, skipped")
 
-    out_dir = Path(cfg["out_bot_dir"])
+    out_dir = Path(cfg["out_bot_dir"]) / f"{year:04d}"  # one folder per year
     out_dir.mkdir(parents=True, exist_ok=True)
 
     for start in range(0, len(tc_steps), CHUNK):

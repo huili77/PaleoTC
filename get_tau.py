@@ -50,7 +50,7 @@ def get_tau_year(year, cfg):
     out_dir.mkdir(parents=True, exist_ok=True)
 
     n = 0
-    for f in sorted(Path(cfg["out_bot_dir"]).glob(f"tcbot.{year:04d}-*.nc")):
+    for f in sorted((Path(cfg["out_bot_dir"]) / f"{year:04d}").glob("tcbot.*.nc")):
         ds = xr.open_dataset(f)
         t = ds["time"].item()
         if t.hour not in cfg["tau_hours"]:
