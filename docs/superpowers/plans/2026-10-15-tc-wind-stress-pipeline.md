@@ -719,7 +719,7 @@ git commit -m "Add get_tau review notes and README"
 - Create: `sourcemods/src.pop/forcing_coupled.F90` (the LR case's file plus a hook)
 - Create: `sourcemods/src.pop/forcing_ws.F90` (the iCESM1.3.1 file plus the TC subroutine)
 
-Why: the Li et al. 2023 `forcing_coupled.F90` is based on a 2011 POP revision, while the Eocene LR case already has its own newer `forcing_coupled.F90` SourceMod. Li's `forcing_ws.F90` differs from the iCESM1.3.1 version only in the TC blocks.
+Why: the Li et al. 2023 `forcing_coupled.F90` is based on a 2011 POP revision (26603; the tag has 87926), while the Eocene LR case already has its own newer `forcing_coupled.F90` SourceMod. That SourceMod holds Jiang Zhu's estuary changes, which compute `ROFF_L`, used by the case's `baroclinic.F90` and `forcing_fields.F90` SourceMods. **Do not use Li's `forcing_coupled.F90`:** it would drop `ROFF_L`, and with it the LR-cntl salt/runoff physics. Only its two hooks are ported. Li's `forcing_ws.F90` differs from the iCESM1.3.1 version only in the TC blocks, but those *add* the stress, ignore `TCMASK`, and hard-code the old CESM1 path (`tc_filename` is not a namelist variable). So the TC subroutine is rewritten below rather than copied. Checked on 2026-10-15: `get_forcing_filename(…, thour00, …)` gives `prefix.YYYY.DDD.HH` (model year, 1-based day, hour), which matches `get_tau.py`. Every symbol used below (`p5`, `c0`, `c1`, `thour00`, io routines, `get_forcing_filename`) is already available through `forcing_ws`'s existing `use` statements.
 
 - [ ] **Step 1: Copy the base files and commit them unmodified**
 
@@ -740,7 +740,23 @@ Replace `   use forcing_ws, only: ws_data_type` with:
 !----- PaleoTC mod end
 ```
 
-In `rotate_wind_stress`, directly before the line `   SMFT(:,:,1,:) = (WORK1(:,:,:)*cos(ANGLET(:,:,:)) +  &`, insert:
+In `rotate_wind_stress`, change the intent of `WORK1, WORK2` from `intent(in)` to `intent(inout)`. Without this the build fails, because an `intent(in)` dummy is passed to an `intent(inout)` one. It is safe: the only caller (`drivers/cpl/ocn_import_export.F90:183`) passes local arrays. Replace
+
+```fortran
+   real (r8), dimension(nx_block,ny_block,max_blocks_clinic), intent(in) ::   &
+      WORK1, WORK2        ! contains taux and tauy from coupler
+```
+
+with
+
+```fortran
+!----- PaleoTC mod: intent(in) -> intent(inout), check_tc_ws modifies WORK1/WORK2
+   real (r8), dimension(nx_block,ny_block,max_blocks_clinic), intent(inout) ::   &
+!----- PaleoTC mod end
+      WORK1, WORK2        ! contains taux and tauy from coupler
+```
+
+Then, directly before the line `   SMFT(:,:,1,:) = (WORK1(:,:,:)*cos(ANGLET(:,:,:)) +  &`, insert:
 
 ```fortran
 !----- PaleoTC mod: replace coupler stress inside TC boxes
@@ -851,7 +867,7 @@ Directly before `end module forcing_ws`, add:
 - [ ] **Step 4: Review the diff**
 
 Run: `git diff -- sourcemods/`
-Expected: only the `PaleoTC mod` blocks have changed.
+Expected: only the `PaleoTC mod` blocks have changed. In `forcing_coupled.F90` that is the `use` line, the intent change, and the `call check_tc_ws`.
 
 - [ ] **Step 5: Commit**
 
@@ -870,3 +886,4 @@ Clone LR-cntl into LR-TC, copy `sourcemods/src.pop/*.F90` into `SourceMods/src.p
 
 - **Coverage against the spec:** task 2a (translate the NCL + parallelization) is Tasks 2 and 4; task 2b is Task 3 plus the notes; task 2c is the notes plus Task 4; organizing the output is the layout above plus Task 5; prescribing the stress in LR-TC is Task 7.
 - **Still open for you:** `lr_year_offset`, which is 0 for now.
+- **Still open for you (daily coupling):** with `OCN_NCPL=1`, POP reads only the 00Z file. That one instantaneous snapshot replaces the *daily-mean* coupler stress for the whole day, and the 06/12/18Z files are never read. Li et al. 2023 had the same behavior. An alternative is to write the mean of the four 6-hourly TC stresses (and the union of their masks) into the 00Z file. Decide before the LR-TC run.
