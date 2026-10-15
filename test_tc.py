@@ -88,3 +88,36 @@ def test_rerun_overwrites(cfg):
     extract_year(31, cfg)
     extract_year(31, cfg)
     assert len(list(Path(cfg["out_bot_dir"]).glob("*"))) == 2
+
+
+# ---- get_tau.py ----
+import netCDF4
+
+from get_tau import get_tau_year, pop_filename, wind_stress
+
+
+def test_wind_stress_magnitude_and_direction():
+    taux, tauy = wind_stress(np.array(30.0), np.array(40.0), np.array(40.0), np.array(1.1))
+    tau = 1.1 * (0.0027 / 40 + 0.000142 + 0.0000764 * 40) * 40.0**2
+    assert taux == pytest.approx(0.6 * tau) and tauy == pytest.approx(0.8 * tau)
+
+
+def test_wind_stress_calm_is_finite():
+    z = np.zeros(3)
+    taux, tauy = wind_stress(z, z, z, np.full(3, 1.1))
+    assert np.isfinite(taux).all() and np.isfinite(tauy).all() and (taux == 0).all()
+
+
+def test_get_tau_writes_pop_files(cfg):
+    assert pop_filename("p", 101, 1, 0) == "p.0101.001.00.nc"  # POP get_forcing_filename format
+    extract_year(31, cfg)
+    assert get_tau_year(31, cfg) == 2
+    f = Path(cfg["out_tau_dir"]) / "fake.tctau.0101.001.06.nc"  # HR year 31 + offset 70, day 1, 06Z
+    with netCDF4.Dataset(f) as nc:
+        assert nc.file_format == "NETCDF3_64BIT_OFFSET"
+        assert all("_FillValue" not in nc[v].ncattrs() for v in ("TAUX", "TAUY", "TCMASK"))
+    ds = xr.open_dataset(f)
+    taux, _ = wind_stress(11.0, -5.0, 20.0, RHO)
+    assert ds.TAUX.values[1, 0] == pytest.approx(taux, rel=1e-5)
+    assert ds.TAUX.values[0, 0] == 0.0 and np.isfinite(ds.TAUY.values).all()
+    assert ds.TCMASK.values.sum() == 2

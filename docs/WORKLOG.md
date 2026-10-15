@@ -26,7 +26,7 @@ Continue from the first unchecked task below. Each task ends with a git commit o
 
 - [x] Task 1: Remove the package; add a plain `config.yaml`
 - [x] Task 2: `extract_tcbot.py` (NCL translation) + tests
-- [ ] Task 3: `get_tau.py` (notebook replacement) + tests
+- [x] Task 3: `get_tau.py` (notebook replacement) + tests
 - [ ] Task 4: `run_casper.py` (dask-jobqueue on Casper)
 - [ ] Task 5: Real run for year 31 + `qc_tau.py`, then all 30 years
 - [ ] Task 6: get_tau review notes + README
@@ -39,3 +39,4 @@ Continue from the first unchecked task below. Each task ends with a git commit o
 - 2026-10-15: Hui found it too complicated. The plan was rewritten as simple scripts (this version); implementation has not started yet.
 - 2026-10-15: v2 Task 1 done: package removed, plain config.yaml added.
 - 2026-10-15: v2 Task 2 done: extract_tcbot.py + test_tc.py (4 tests). Awaiting Hui's code review; not yet run on real HR data.
+- 2026-10-15: v2 Task 3 done: get_tau.py (+3 tests, 7 total). Tested extract+get_tau on year 31 Jan 1-3 (12 steps): max |tau| 1.4-2.7 N/m2, no NaN, zero outside boxes. Casper account P93300014 is invalid -> must change casper.account in config.yaml before Task 4/5.
