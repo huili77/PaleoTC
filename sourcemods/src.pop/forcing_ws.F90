@@ -50,6 +50,14 @@
 
    character (char_len), parameter :: tc_filename = &
       '/glade/derecho/scratch/huili7/PaleoTC/tc_tau/b.e13.B1850C5.ne120_t12.icesm13_ihesp.eocene_03x.002.tctau'
+
+   ! TC files exist for track years tc_first_year..tc_first_year+tc_nyears-1;
+   ! model year tc_model_year0 reads track year tc_first_year, and the
+   ! track years repeat every tc_nyears model years.
+   integer (int_kind), parameter :: &
+      tc_first_year  = 31, &! first track year with TC files
+      tc_nyears      = 30, &! number of track years (cycle length)
+      tc_model_year0 = 1    ! model year that reads tc_first_year
 !----- PaleoTC mod end
 
 !EOP
@@ -757,19 +765,22 @@
 ! !DESCRIPTION:
 !  If a TC wind-stress file exists for the current coupling time, replace
 !  the coupler wind stress (east/north, N/m2) inside the TC boxes (TCMASK=1).
+!  File name: tc_filename.YYYY.DDD.HH.nc, where YYYY is the track year that
+!  the current model year maps to (repeating cycle), DDD the day of year.
 
    real (r8), dimension(nx_block,ny_block,max_blocks_clinic), intent(inout) :: &
       WORK1, WORK2        ! taux and tauy from coupler
 
-   integer (int_kind) :: iblock
+   integer (int_kind) :: iblock, tc_year
    character (char_len) :: forcing_filename
    type (datafile) :: forcing_file
    type (io_field_desc) :: io_taux, io_tauy, io_mask
    type (io_dim) :: i_dim, j_dim
    logical (log_kind) :: iexist
 
-   call get_forcing_filename(forcing_filename, tc_filename, thour00, c1)
-   forcing_filename = trim(forcing_filename)//'.nc'
+   tc_year = tc_first_year + modulo(iyear - tc_model_year0, tc_nyears)
+   write(forcing_filename,'(a,".",i4.4,".",i3.3,".",i2.2,".nc")') &
+         trim(tc_filename), tc_year, iday_of_year, ihour
    inquire (file=trim(forcing_filename), exist=iexist)
    if (.not. iexist) return
 
@@ -803,7 +814,8 @@
    call destroy_file(forcing_file)
 
    if (my_task == master_task) then
-      write(stdout,'(a22,a)') ' TC file read: ', trim(forcing_filename)
+      write(stdout,'(a,i6,a,a)') ' TC file read (model year', iyear, '): ', &
+                                 trim(forcing_filename)
    endif
 
    !$OMP PARALLEL DO PRIVATE(iblock)

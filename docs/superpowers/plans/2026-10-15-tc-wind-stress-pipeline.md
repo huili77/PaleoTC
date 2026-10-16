@@ -26,7 +26,7 @@
 | Direction | Along (UBOT, VBOT), east/north. Ocean currents are ignored. | Coupler `WORK1`/`WORK2` are east/north |
 | Box | Half-open box: `[-10°, 10°)` in latitude and in wrapped longitude around each center. The union over all storms, AND the ocean mask. | Same as the Li et al. 2023 NCL, plus the longitude-wrap fix |
 | Coupler | **Replace** the coupler stress where `TCMASK = 1` (your decision). The Li et al. 2023 SourceMod *added* it. | Task 7 |
-| File name | `{tau_prefix}.{YYYY}.{DDD}.{HH}.nc`. YYYY = HR year + `lr_year_offset` (0 for now); DDD = 1-based noleap day of year. | POP `get_forcing_filename` |
+| File name | `{tau_prefix}.{YYYY}.{DDD}.{HH}.nc`. YYYY = HR (track) year + `lr_year_offset` (0); DDD = 1-based noleap day of year. POP maps model year → track year itself, as a repeating 30-year cycle (Task 7). | POP `get_forcing_filename` format; cycle in `check_tc_ws` |
 | Hours exported | 00, 06, 12, 18. POP only reads 00Z because the ocean couples daily, but a missing file is skipped silently, so all hours are written. | `OCN_NCPL=1` |
 
 ## Global Constraints
@@ -719,7 +719,7 @@ git commit -m "Add get_tau review notes and README"
 - Create: `sourcemods/src.pop/forcing_coupled.F90` (the LR case's file plus a hook)
 - Create: `sourcemods/src.pop/forcing_ws.F90` (the iCESM1.3.1 file plus the TC subroutine)
 
-Why: the Li et al. 2023 `forcing_coupled.F90` is based on a 2011 POP revision (26603; the tag has 87926), while the Eocene LR case already has its own newer `forcing_coupled.F90` SourceMod. That SourceMod holds Jiang Zhu's estuary changes, which compute `ROFF_L`, used by the case's `baroclinic.F90` and `forcing_fields.F90` SourceMods. **Do not use Li's `forcing_coupled.F90`:** it would drop `ROFF_L`, and with it the LR-cntl salt/runoff physics. Only its two hooks are ported. Li's `forcing_ws.F90` differs from the iCESM1.3.1 version only in the TC blocks, but those *add* the stress, ignore `TCMASK`, and hard-code the old CESM1 path (`tc_filename` is not a namelist variable). So the TC subroutine is rewritten below rather than copied. Checked on 2026-10-15: `get_forcing_filename(…, thour00, …)` gives `prefix.YYYY.DDD.HH` (model year, 1-based day, hour), which matches `get_tau.py`. Every symbol used below (`p5`, `c0`, `c1`, `thour00`, io routines, `get_forcing_filename`) is already available through `forcing_ws`'s existing `use` statements.
+Why: the Li et al. 2023 `forcing_coupled.F90` is based on a 2011 POP revision (26603; the tag has 87926), while the Eocene LR case already has its own newer `forcing_coupled.F90` SourceMod. That SourceMod holds Jiang Zhu's estuary changes, which compute `ROFF_L`, used by the case's `baroclinic.F90` and `forcing_fields.F90` SourceMods. **Do not use Li's `forcing_coupled.F90`:** it would drop `ROFF_L`, and with it the LR-cntl salt/runoff physics. Only its two hooks are ported. Li's `forcing_ws.F90` differs from the iCESM1.3.1 version only in the TC blocks, but those *add* the stress, ignore `TCMASK`, and hard-code the old CESM1 path (`tc_filename` is not a namelist variable). So the TC subroutine is rewritten below rather than copied. **Repeating track cycle (decided 2026-10-15, for runs such as 300 years):** POP's `get_forcing_filename` always uses the model year. Instead, `check_tc_ws` builds the name itself: track year = `tc_first_year + modulo(iyear - tc_model_year0, tc_nyears)`, with `tc_first_year=31`, `tc_nyears=30` and `tc_model_year0=1` (for now). So model years 1–30 read track years 31–60, 31–60 read 31–60 again, and so on. The format `prefix.YYYY.DDD.HH.nc` is the same as `get_tau.py` and `get_forcing_filename`. This replaces `lr_year_offset` for the POP side; keep it 0 in `config.yaml`. The cost is one seam every 30 years (31 Dec of year 60 → 1 Jan of year 31). Every symbol used below (`p5`, `c0`, `iyear`, `iday_of_year`, `ihour`, io routines) is already available through `forcing_ws`'s existing `use` statements.
 
 - [ ] **Step 1: Copy the base files and commit them unmodified**
 
@@ -784,6 +784,14 @@ After the `ws_interp_last` public declaration, add:
 
    character (char_len), parameter :: tc_filename = &
       '/glade/derecho/scratch/huili7/PaleoTC/tc_tau/b.e13.B1850C5.ne120_t12.icesm13_ihesp.eocene_03x.002.tctau'
+
+   ! TC files exist for track years tc_first_year..tc_first_year+tc_nyears-1;
+   ! model year tc_model_year0 reads track year tc_first_year, and the
+   ! track years repeat every tc_nyears model years.
+   integer (int_kind), parameter :: &
+      tc_first_year  = 31, &! first track year with TC files
+      tc_nyears      = 30, &! number of track years (cycle length)
+      tc_model_year0 = 1    ! model year that reads tc_first_year
 !----- PaleoTC mod end
 ```
 
@@ -801,19 +809,22 @@ Directly before `end module forcing_ws`, add:
 ! !DESCRIPTION:
 !  If a TC wind-stress file exists for the current coupling time, replace
 !  the coupler wind stress (east/north, N/m2) inside the TC boxes (TCMASK=1).
+!  File name: tc_filename.YYYY.DDD.HH.nc, where YYYY is the track year that
+!  the current model year maps to (repeating cycle), DDD the day of year.
 
    real (r8), dimension(nx_block,ny_block,max_blocks_clinic), intent(inout) :: &
       WORK1, WORK2        ! taux and tauy from coupler
 
-   integer (int_kind) :: iblock
+   integer (int_kind) :: iblock, tc_year
    character (char_len) :: forcing_filename
    type (datafile) :: forcing_file
    type (io_field_desc) :: io_taux, io_tauy, io_mask
    type (io_dim) :: i_dim, j_dim
    logical (log_kind) :: iexist
 
-   call get_forcing_filename(forcing_filename, tc_filename, thour00, c1)
-   forcing_filename = trim(forcing_filename)//'.nc'
+   tc_year = tc_first_year + modulo(iyear - tc_model_year0, tc_nyears)
+   write(forcing_filename,'(a,".",i4.4,".",i3.3,".",i2.2,".nc")') &
+         trim(tc_filename), tc_year, iday_of_year, ihour
    inquire (file=trim(forcing_filename), exist=iexist)
    if (.not. iexist) return
 
@@ -847,7 +858,8 @@ Directly before `end module forcing_ws`, add:
    call destroy_file(forcing_file)
 
    if (my_task == master_task) then
-      write(stdout,'(a22,a)') ' TC file read: ', trim(forcing_filename)
+      write(stdout,'(a,i6,a,a)') ' TC file read (model year', iyear, '): ', &
+                                 trim(forcing_filename)
    endif
 
    !$OMP PARALLEL DO PRIVATE(iblock)
@@ -878,12 +890,13 @@ git commit -m "Port TC wind-stress SourceMods to Eocene LR with replace semantic
 
 - [ ] **Step 6 (you do this): build and run a 5-day test**
 
-Clone LR-cntl into LR-TC, copy `sourcemods/src.pop/*.F90` into `SourceMods/src.pop/`, and run `./case.build`. Expected: it compiles cleanly. Then run 5 days on dates that have TCs. Expected: `ocn.log` shows a `TC file read:` line on each day that has a 00Z file.
+Clone LR-cntl into LR-TC, copy `sourcemods/src.pop/*.F90` into `SourceMods/src.pop/`, and run `./case.build`. Expected: it compiles cleanly. Then run 5 days on dates that have TCs. Expected: `ocn.log` shows a `TC file read:` line on each day that has a 00Z file. With `tc_model_year0 = 1`, model year 1 reads track year 31, so the 5-day test can start at year 1.
 
 ---
 
 ## Self-review notes
 
 - **Coverage against the spec:** task 2a (translate the NCL + parallelization) is Tasks 2 and 4; task 2b is Task 3 plus the notes; task 2c is the notes plus Task 4; organizing the output is the layout above plus Task 5; prescribing the stress in LR-TC is Task 7.
-- **Still open for you:** `lr_year_offset`, which is 0 for now.
+- **Still open for you:** `tc_model_year0` in `forcing_ws.F90` (1 for now). Set it to the LR-TC model year that should read track year 31. `lr_year_offset` in `config.yaml` stays 0, because the year mapping now lives in the SourceMod.
+- **Storage:** POP reads only the 00Z files (about 14 GB of the 54 GB). Copy them off scratch to `/glade/work` or campaign storage before a long run, and change `tc_filename` to the new location.
 - **Still open for you (daily coupling):** with `OCN_NCPL=1`, POP reads only the 00Z file. That one instantaneous snapshot replaces the *daily-mean* coupler stress for the whole day, and the 06/12/18Z files are never read. Li et al. 2023 had the same behavior. An alternative is to write the mean of the four 6-hourly TC stresses (and the union of their masks) into the 00Z file. Decide before the LR-TC run.
