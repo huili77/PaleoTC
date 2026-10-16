@@ -4,7 +4,7 @@
 
 **Goal:** Turn TC winds from the Eocene HR run into the wind-stress files that the LR-TC POP SourceMods read. This is done with a few plain Python scripts that translate the Li et al. 2023 NCL and notebook workflow.
 
-**Architecture:** There are two scripts, mirroring the old workflow. `extract_tcbot.py YEAR` translates `extract_tcbot_batch.ncl` and writes one boxed-wind file per TC time step. `get_tau.py YEAR` replaces `get_tau_dask.ipynb`: it turns those files into POP-ready stress files. `run_casper.py FIRST LAST` runs both scripts for many years in parallel through dask-jobqueue on Casper. Every setting lives in `config.yaml`, which is read with `yaml.safe_load`.
+**Architecture:** There are two scripts, mirroring the old workflow. `extract_tcbot.py YEAR` translates `extract_tcbot_batch.ncl` and writes one boxed-wind file per TC time step. `get_tau.py YEAR` replaces `get_tau_dask.ipynb`: it turns those files into POP-ready stress files, one daily-mean file per day (since 2026-10-15; the 6-hourly snapshot version is kept as `get_tau_00z.py`). `run_casper.py FIRST LAST` runs both scripts for many years in parallel through dask-jobqueue on Casper. Every setting lives in `config.yaml`, which is read with `yaml.safe_load`.
 
 **Tech Stack:** Python 3.12, numpy, scipy.sparse, xarray, netCDF4, cftime, PyYAML, dask and dask-jobqueue, matplotlib (QC only), pytest. Uses the conda env `/glade/work/huili7/miniconda3/envs/paleotc`, which already exists. No package install is needed.
 
@@ -27,7 +27,7 @@
 | Box | Half-open box: `[-10°, 10°)` in latitude and in wrapped longitude around each center. The union over all storms, AND the ocean mask. | Same as the Li et al. 2023 NCL, plus the longitude-wrap fix |
 | Coupler | **Replace** the coupler stress where `TCMASK = 1` (your decision). The Li et al. 2023 SourceMod *added* it. | Task 7 |
 | File name | `{tau_prefix}.{YYYY}.{DDD}.{HH}.nc`. YYYY = HR (track) year + `lr_year_offset` (0); DDD = 1-based noleap day of year. POP maps model year → track year itself, as a repeating 30-year cycle (Task 7). | POP `get_forcing_filename` format; cycle in `check_tc_ws` |
-| Hours exported | 00, 06, 12, 18. POP only reads 00Z because the ocean couples daily, but a missing file is skipped silently, so all hours are written. | `OCN_NCPL=1` |
+| Hours exported | 00, 06, 12, 18 are all used. **Decided 2026-10-15:** POP reads only the 00Z file (the ocean couples daily), so `get_tau.py` writes the **daily mean** of the day's snapshots under the 00Z name: TAUX/TAUY averaged over the time steps at which a point is inside a box, and TCMASK = 1 if it is inside at any of them. This makes a swath along the day's track, gives the same daily Ekman pumping as the snapshots, and is consistent with the coupler's daily-mean stress. The cost is less mixing (the u*³ proxy is about −41% in the year-60 21 Aug test). `get_tau_00z.py` keeps the 6-hourly snapshots in `tc_tau/`. | `OCN_NCPL=1`; comparison figure for 0060-08-21 |
 
 ## Global Constraints
 
@@ -53,7 +53,8 @@
 PaleoTC/
 ├── config.yaml          # every path and parameter
 ├── extract_tcbot.py     # HR h2 → tc_bot/tcbot.YYYY-MM-DD-HH.nc  (UBOT VBOT U10 RHO TCMASK)
-├── get_tau.py           # tc_bot → tc_tau/{prefix}.YYYY.DDD.HH.nc (TAUX TAUY TCMASK)
+├── get_tau.py           # tc_bot → tc_tau_daily/{prefix}.YYYY.DDD.00.nc (daily mean; TAUX TAUY TCMASK)
+├── get_tau_00z.py       # tc_bot → tc_tau/{prefix}.YYYY.DDD.HH.nc (6-hourly snapshots)
 ├── run_casper.py        # PBSCluster on Casper: both scripts for a range of years
 ├── qc_tau.py            # stats + plot of the strongest snapshot of one year
 ├── test_tc.py           # 7 tests on a tiny synthetic case
@@ -898,5 +899,5 @@ Clone LR-cntl into LR-TC, copy `sourcemods/src.pop/*.F90` into `SourceMods/src.p
 
 - **Coverage against the spec:** task 2a (translate the NCL + parallelization) is Tasks 2 and 4; task 2b is Task 3 plus the notes; task 2c is the notes plus Task 4; organizing the output is the layout above plus Task 5; prescribing the stress in LR-TC is Task 7.
 - **Still open for you:** `tc_model_year0` in `forcing_ws.F90` (1 for now). Set it to the LR-TC model year that should read track year 31. `lr_year_offset` in `config.yaml` stays 0, because the year mapping now lives in the SourceMod.
-- **Storage:** POP reads only the 00Z files (about 14 GB of the 54 GB). Copy them off scratch to `/glade/work` or campaign storage before a long run, and change `tc_filename` to the new location.
-- **Still open for you (daily coupling):** with `OCN_NCPL=1`, POP reads only the 00Z file. That one instantaneous snapshot replaces the *daily-mean* coupler stress for the whole day, and the 06/12/18Z files are never read. Li et al. 2023 had the same behavior. An alternative is to write the mean of the four 6-hourly TC stresses (and the union of their masks) into the 00Z file. Decide before the LR-TC run.
+- **Storage:** POP reads only `tc_tau_daily/` (one file per TC day). Copy it off scratch to `/glade/work` or campaign storage before a long run, and change `tc_filename` to the new location.
+- **Daily coupling (resolved 2026-10-15):** `get_tau.py` now writes the daily mean into the 00Z-named file in `tc_tau_daily/`, and the SourceMod's `tc_filename` points there. To go back to the 00Z snapshot, point `tc_filename` at `tc_tau/` (written by `get_tau_00z.py`); no other change is needed.

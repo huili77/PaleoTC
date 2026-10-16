@@ -56,7 +56,8 @@ def cfg(tmp_path):
     return {"case": "fake", "hr_dir": str(tmp_path / "hr"), "track_file": str(tmp_path / "tracks.txt"),
             "map_file": str(tmp_path / "map.nc"), "ocn_domain_file": str(tmp_path / "domain.nc"),
             "box_half_width": 10.0, "out_bot_dir": str(tmp_path / "bot"),
-            "out_tau_dir": str(tmp_path / "tau"), "tau_prefix": "fake.tctau",
+            "out_tau_dir": str(tmp_path / "tau_daily"), "out_tau_00z_dir": str(tmp_path / "tau"),
+            "tau_prefix": "fake.tctau",
             "lr_year_offset": 70, "tau_hours": [0, 6, 12, 18]}
 
 
@@ -90,10 +91,11 @@ def test_rerun_overwrites(cfg):
     assert len(list((Path(cfg["out_bot_dir"]) / "0031").glob("*"))) == 2
 
 
-# ---- get_tau.py ----
+# ---- get_tau_00z.py (6-hourly snapshots) ----
 import netCDF4
 
-from get_tau import get_tau_year, pop_filename, wind_stress
+from get_tau_00z import get_tau_year as get_tau_00z_year
+from get_tau_00z import pop_filename, wind_stress
 
 
 def test_wind_stress_magnitude_and_direction():
@@ -111,8 +113,8 @@ def test_wind_stress_calm_is_finite():
 def test_get_tau_writes_pop_files(cfg):
     assert pop_filename("p", 101, 1, 0) == "p.0101.001.00.nc"  # POP get_forcing_filename format
     extract_year(31, cfg)
-    assert get_tau_year(31, cfg) == 2
-    f = Path(cfg["out_tau_dir"]) / "fake.tctau.0101.001.06.nc"  # HR year 31 + offset 70, day 1, 06Z
+    assert get_tau_00z_year(31, cfg) == 2
+    f = Path(cfg["out_tau_00z_dir"]) / "fake.tctau.0101.001.06.nc"  # HR year 31 + offset 70, day 1, 06Z
     with netCDF4.Dataset(f) as nc:
         assert nc.file_format == "NETCDF3_64BIT_OFFSET"
         assert all("_FillValue" not in nc[v].ncattrs() for v in ("TAUX", "TAUY", "TCMASK"))
@@ -120,4 +122,38 @@ def test_get_tau_writes_pop_files(cfg):
     taux, _ = wind_stress(11.0, -5.0, 20.0, RHO)
     assert ds.TAUX.values[1, 0] == pytest.approx(taux, rel=1e-5)
     assert ds.TAUX.values[0, 0] == 0.0 and np.isfinite(ds.TAUY.values).all()
+    assert ds.TCMASK.values.sum() == 2
+
+
+# ---- get_tau.py (daily mean) ----
+from get_tau import get_tau_year
+
+
+def test_get_tau_daily_mean(cfg):
+    # day 1: 00Z box covers (0N,0E) only; 06Z boxes cover (0N,0E) and (20N,0E) (wrapped storm)
+    extract_year(31, cfg)
+    assert get_tau_year(31, cfg) == 1  # one file for the day, named for 00Z
+    assert not (Path(cfg["out_tau_dir"]) / "fake.tctau.0101.001.06.nc").exists()
+    f = Path(cfg["out_tau_dir"]) / "fake.tctau.0101.001.00.nc"
+    with netCDF4.Dataset(f) as nc:
+        assert nc.file_format == "NETCDF3_64BIT_OFFSET"
+        assert all("_FillValue" not in nc[v].ncattrs() for v in ("TAUX", "TAUY", "TCMASK"))
+    ds = xr.open_dataset(f)
+    x00, _ = wind_stress(10.0, -5.0, 20.0, RHO)
+    x06, _ = wind_stress(11.0, -5.0, 20.0, RHO)
+    assert ds.TAUX.values[1, 0] == pytest.approx((x00 + x06) / 2, rel=1e-5)  # inside at both times
+    assert ds.TAUX.values[2, 0] == pytest.approx(x06, rel=1e-5)  # inside at 06Z only
+    assert ds.TCMASK.values.sum() == 2 and ds.TCMASK.values[1, 0] == 1 and ds.TCMASK.values[2, 0] == 1
+    assert ds.TAUX.values[0, 0] == 0.0 and np.isfinite(ds.TAUY.values).all()
+    assert ds.attrs["hr_times"].count(",") == 1
+
+
+def test_get_tau_daily_without_00z_step(cfg):
+    # a day whose storms appear after 00Z still gets a 00Z-named file
+    extract_year(31, cfg)
+    (Path(cfg["out_bot_dir"]) / "0031" / "tcbot.0031-01-01-00.nc").unlink()
+    assert get_tau_year(31, cfg) == 1
+    ds = xr.open_dataset(Path(cfg["out_tau_dir"]) / "fake.tctau.0101.001.00.nc")
+    x06, _ = wind_stress(11.0, -5.0, 20.0, RHO)
+    assert ds.TAUX.values[1, 0] == pytest.approx(x06, rel=1e-5)
     assert ds.TCMASK.values.sum() == 2

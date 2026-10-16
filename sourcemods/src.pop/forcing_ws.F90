@@ -49,7 +49,7 @@
       TC_MASK       ! 1 inside TC boxes over ocean, 0 elsewhere
 
    character (char_len), parameter :: tc_filename = &
-      '/glade/derecho/scratch/huili7/PaleoTC/tc_tau/b.e13.B1850C5.ne120_t12.icesm13_ihesp.eocene_03x.002.tctau'
+      '/glade/derecho/scratch/huili7/PaleoTC/tc_tau_daily/b.e13.B1850C5.ne120_t12.icesm13_ihesp.eocene_03x.002.tctau'
 
    ! TC files exist for track years tc_first_year..tc_first_year+tc_nyears-1;
    ! model year tc_model_year0 reads track year tc_first_year, and the

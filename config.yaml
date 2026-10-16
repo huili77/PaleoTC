@@ -7,7 +7,8 @@ ocn_domain_file: /glade/work/jiangzhu/data/inputdata/cesm13_eocene/ne30_g16/doma
 box_half_width: 10.0          # degrees -> 20x20 box
 
 out_bot_dir: /glade/derecho/scratch/huili7/PaleoTC/tc_bot
-out_tau_dir: /glade/derecho/scratch/huili7/PaleoTC/tc_tau
+out_tau_dir: /glade/derecho/scratch/huili7/PaleoTC/tc_tau_daily   # get_tau.py: daily mean (POP default)
+out_tau_00z_dir: /glade/derecho/scratch/huili7/PaleoTC/tc_tau      # get_tau_00z.py: 6-hourly snapshots
 tau_prefix: b.e13.B1850C5.ne120_t12.icesm13_ihesp.eocene_03x.002.tctau
 lr_year_offset: 0             # LR-TC model year = HR year + offset (revisit before LR-TC run)
 tau_hours: [0, 6, 12, 18]
